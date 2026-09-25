@@ -1,0 +1,121 @@
+from pathlib import Path
+
+html = r'''<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<title>NITRO RACER</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#111;font-family:Arial,sans-serif;touch-action:none}
+#game{position:relative;width:100vw;height:100vh;overflow:hidden;background:#183018}
+#road{position:absolute;left:12%;width:76%;height:220%;top:-60%;background:#444;border-left:10px solid #ddd;border-right:10px solid #ddd}
+.roadline{position:absolute;width:10px;height:90px;background:#fff;left:50%;transform:translateX(-50%)}
+.car{position:absolute;width:58px;height:96px;border-radius:14px;border:4px solid #111;z-index:5}
+#player{background:#e52525;bottom:105px;left:50%;transform:translateX(-50%)}
+.enemy{background:#2384ff}
+.enemy.yellow{background:#ffd21c}
+.obstacle{position:absolute;width:62px;height:38px;background:#202020;border:4px solid #ff6b00;border-radius:7px;z-index:4}
+#hud{position:absolute;z-index:20;top:14px;left:14px;font-size:21px;font-weight:bold;line-height:1.45;text-shadow:2px 2px 3px #000}
+#bar{position:absolute;z-index:20;right:14px;top:14px;width:190px;height:24px;border:3px solid #fff;background:#222}
+#nitro{height:100%;width:100%;background:#00d9ff}
+button{position:absolute;z-index:30;color:#fff;background:#111c;border:3px solid #fff;border-radius:18px;font-weight:bold;font-size:23px}
+#left,#right{bottom:25px;width:88px;height:82px}
+#left{left:24px} #right{left:126px}
+#boost{right:24px;bottom:25px;width:135px;height:82px}
+#start{left:50%;top:50%;transform:translate(-50%,-50%);padding:18px 34px;background:#e52525}
+#msg{position:absolute;z-index:25;top:40%;width:100%;text-align:center;font-size:40px;font-weight:bold;text-shadow:3px 3px 4px #000}
+</style>
+</head>
+<body>
+<div id="game">
+  <div id="road"></div>
+  <div id="hud">🏁 Vuelta: <span id="lap">1</span><br>🏎️ Puntos: <span id="score">0</span></div>
+  <div id="bar"><div id="nitro"></div></div>
+  <div id="player" class="car"></div>
+  <div id="msg">NITRO RACER</div>
+  <button id="start">JUGAR</button>
+  <button id="left">◀</button>
+  <button id="right">▶</button>
+  <button id="boost">💨 NITRO</button>
+</div>
+<script>
+const game=document.getElementById("game"),player=document.getElementById("player");
+const start=document.getElementById("start"),msg=document.getElementById("msg");
+const nitroBar=document.getElementById("nitro"),scoreEl=document.getElementById("score");
+let running=false,left=false,right=false,boost=false,x=50,nitro=100,score=0,lap=1;
+const enemies=[],obstacles=[],lines=[];
+
+for(let i=0;i<12;i++){
+  const e=document.createElement("div");e.className="roadline";
+  e.style.top=(i*155)+"px";game.appendChild(e);lines.push(e);
+}
+function enemy(x,y,c="enemy"){
+  const e=document.createElement("div");e.className="car "+c;
+  game.appendChild(e);e.style.left=x+"%";e.style.top=y+"px";
+  enemies.push({e,x,y,s:1.5+Math.random()*2});
+}
+function obstacle(x,y){
+  const e=document.createElement("div");e.className="obstacle";
+  game.appendChild(e);e.style.left=x+"%";e.style.top=y+"px";
+  obstacles.push({e,x,y});
+}
+enemy(28,-260);enemy(68,-620,"enemy yellow");enemy(45,-980);enemy(75,-1350,"enemy yellow");
+obstacle(22,-450);obstacle(70,-760);obstacle(42,-1120);obstacle(62,-1500);
+
+function hit(a,b){
+ const A=a.getBoundingClientRect(),B=b.getBoundingClientRect();
+ return !(A.right<B.left||A.left>B.right||A.bottom<B.top||A.top>B.bottom);
+}
+function reset(){
+ running=true;x=50;nitro=100;score=0;lap=1;
+ scoreEl.textContent=0;document.getElementById("lap").textContent=1;
+ msg.textContent="";start.style.display="none";
+ enemies.forEach((o,i)=>{o.y=-300-i*380});
+ obstacles.forEach((o,i)=>{o.y=-500-i*420});
+}
+function end(text){
+ running=false;msg.textContent=text;start.textContent="JUGAR DE NUEVO";start.style.display="block";
+}
+function frame(){
+ if(running){
+  if(left)x-=.85;if(right)x+=.85;
+  x=Math.max(18,Math.min(82,x));player.style.left=x+"%";
+  let sp=5;
+  if(boost&&nitro>0){sp=10;nitro-=.75}else nitro+=.18;
+  nitro=Math.max(0,Math.min(100,nitro));nitroBar.style.width=nitro+"%";
+  lines.forEach(e=>{let y=parseFloat(e.style.top)+sp;if(y>innerHeight)y=-100;e.style.top=y+"px"});
+  enemies.forEach(o=>{
+   o.y+=sp-o.s;if(o.y>innerHeight+120){o.y=-500-Math.random()*900;o.x=20+Math.random()*60;score+=100}
+   o.e.style.top=o.y+"px";o.e.style.left=o.x+"%";if(hit(player,o.e))end("💥 ¡CHOCASTE!");
+  });
+  obstacles.forEach(o=>{
+   o.y+=sp;if(o.y>innerHeight+100){o.y=-500-Math.random()*900;o.x=20+Math.random()*60}
+   o.e.style.top=o.y+"px";o.e.style.left=o.x+"%";if(hit(player,o.e))end("💥 ¡CHOCASTE!");
+  });
+  score+=1;scoreEl.textContent=Math.floor(score/10);
+  if(score>=3000){lap++;score=0;document.getElementById("lap").textContent=lap;if(lap>3)end("🏆 ¡GANASTE!")}
+ }
+ requestAnimationFrame(frame);
+}
+start.onclick=reset;
+function bind(id,down,up){
+ const b=document.getElementById(id);
+ b.addEventListener("pointerdown",e=>{e.preventDefault();down()});
+ b.addEventListener("pointerup",e=>{e.preventDefault();up()});
+ b.addEventListener("pointercancel",up);
+}
+bind("left",()=>left=true,()=>left=false);
+bind("right",()=>right=true,()=>right=false);
+bind("boost",()=>boost=true,()=>boost=false);
+addEventListener("keydown",e=>{if(e.key==="ArrowLeft")left=true;if(e.key==="ArrowRight")right=true;if(e.code==="Space")boost=true});
+addEventListener("keyup",e=>{if(e.key==="ArrowLeft")left=false;if(e.key==="ArrowRight")right=false;if(e.code==="Space")boost=false});
+frame();
+</script>
+</body>
+</html>'''
+
+path = Path("/mnt/data/nitro_racer.html")
+path.write_text(html, encoding="utf-8")
+print(f"Archivo creado: {path}")
